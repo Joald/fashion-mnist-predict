@@ -13115,7 +13115,7 @@ div#notebook {
 
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[4]:</div>
+<div class="prompt input_prompt">In&nbsp;[2]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="kn">from</span> <span class="nn">torchvision.datasets</span> <span class="k">import</span> <span class="n">FashionMNIST</span>
@@ -13128,10 +13128,407 @@ div#notebook {
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[5]:</div>
+<div class="prompt input_prompt">In&nbsp;[115]:</div>
 <div class="inner_cell">
     <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="n">FashionMNIST</span><span class="o">.</span><span class="n">download</span><span class="p">()</span>
+<div class=" highlight hl-ipython3"><pre><span></span><span class="kn">from</span> <span class="nn">torch.utils.data</span> <span class="k">import</span> <span class="n">DataLoader</span><span class="p">,</span> <span class="n">TensorDataset</span>
+<span class="n">train</span> <span class="o">=</span> <span class="n">FashionMNIST</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="n">download</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">train</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">dl</span> <span class="o">=</span> <span class="n">DataLoader</span><span class="p">(</span><span class="n">TensorDataset</span><span class="p">(</span><span class="n">train</span><span class="o">.</span><span class="n">train_data</span><span class="p">,</span> <span class="n">train</span><span class="o">.</span><span class="n">train_labels</span><span class="p">),</span> <span class="n">batch_size</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">train</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.3</span><span class="p">))</span>
+<span class="n">it</span> <span class="o">=</span> <span class="nb">iter</span><span class="p">(</span><span class="n">dl</span><span class="p">)</span>
+<span class="n">valid</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">)</span>
+<span class="n">valid_dl</span> <span class="o">=</span> <span class="n">DataLoader</span><span class="p">(</span><span class="n">TensorDataset</span><span class="p">(</span><span class="n">valid</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">type</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">),</span> <span class="n">valid</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
+<span class="n">Xs</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">ys</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">it</span><span class="p">:</span>
+    <span class="n">Xs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">type</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">))</span>
+    <span class="n">ys</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+
+<span class="n">train_X</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span><span class="n">Xs</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+    
+<span class="n">train_dl</span> <span class="o">=</span> <span class="n">DataLoader</span><span class="p">(</span><span class="n">TensorDataset</span><span class="p">(</span><span class="n">train_X</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span><span class="n">ys</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
+<span class="c1"># valid[0].size(), valid[1].size()</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[116]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">torch.utils.data</span> <span class="k">import</span> <span class="n">DataLoader</span>
+<span class="kn">import</span> <span class="nn">torch.nn</span> <span class="k">as</span> <span class="nn">nn</span>
+<span class="kn">import</span> <span class="nn">torch.nn.functional</span> <span class="k">as</span> <span class="nn">F</span>
+
+
+<span class="k">class</span> <span class="nc">FirstCNN</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">conv1</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Conv2d</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">16</span><span class="p">,</span> <span class="n">kernel_size</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">stride</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">padding</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">conv2</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Conv2d</span><span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">16</span><span class="p">,</span> <span class="n">kernel_size</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">stride</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">padding</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">conv3</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Conv2d</span><span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="n">kernel_size</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">stride</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">padding</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">xb</span><span class="p">):</span>
+        <span class="n">xb</span> <span class="o">=</span> <span class="n">xb</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">28</span><span class="p">,</span> <span class="mi">28</span><span class="p">)</span>
+        <span class="n">xb</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">relu</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">conv1</span><span class="p">(</span><span class="n">xb</span><span class="p">))</span>
+        <span class="n">xb</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">relu</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">conv2</span><span class="p">(</span><span class="n">xb</span><span class="p">))</span>
+        <span class="n">xb</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">relu</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">conv3</span><span class="p">(</span><span class="n">xb</span><span class="p">))</span>
+        <span class="n">xb</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">avg_pool2d</span><span class="p">(</span><span class="n">xb</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">xb</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">xb</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span>
+
+<span class="n">lr</span> <span class="o">=</span> <span class="mf">0.1</span>
+
+<span class="k">def</span> <span class="nf">loss_batch</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">loss_func</span><span class="p">,</span> <span class="n">xb</span><span class="p">,</span> <span class="n">yb</span><span class="p">,</span> <span class="n">opt</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="c1">#     print(model(xb).type(), yb.type())</span>
+    <span class="n">loss</span> <span class="o">=</span> <span class="n">loss_func</span><span class="p">(</span><span class="n">model</span><span class="p">(</span><span class="n">xb</span><span class="p">),</span> <span class="n">yb</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">opt</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">loss</span><span class="o">.</span><span class="n">backward</span><span class="p">()</span>
+        <span class="n">opt</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
+        <span class="n">opt</span><span class="o">.</span><span class="n">zero_grad</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">loss</span><span class="o">.</span><span class="n">item</span><span class="p">(),</span> <span class="nb">len</span><span class="p">(</span><span class="n">xb</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="n">epochs</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">loss_func</span><span class="p">,</span> <span class="n">opt</span><span class="p">,</span> <span class="n">train_dl</span><span class="p">,</span> <span class="n">valid_dl</span><span class="p">):</span>
+    <span class="k">for</span> <span class="n">epoch</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">epochs</span><span class="p">):</span>
+        <span class="n">model</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">xb</span><span class="p">,</span> <span class="n">yb</span> <span class="ow">in</span> <span class="n">train_dl</span><span class="p">:</span>
+            <span class="n">loss_batch</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">loss_func</span><span class="p">,</span> <span class="n">xb</span><span class="p">,</span> <span class="n">yb</span><span class="p">,</span> <span class="n">opt</span><span class="p">)</span>
+
+        <span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+        <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+            <span class="n">losses</span><span class="p">,</span> <span class="n">nums</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="n">loss_batch</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">loss_func</span><span class="p">,</span> <span class="n">xb</span><span class="p">,</span> <span class="n">yb</span><span class="p">)</span> <span class="k">for</span> <span class="n">xb</span><span class="p">,</span> <span class="n">yb</span> <span class="ow">in</span> <span class="n">valid_dl</span><span class="p">])</span>
+        <span class="n">val_loss</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">losses</span><span class="p">,</span> <span class="n">nums</span><span class="p">))</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">nums</span><span class="p">)</span>
+
+        <span class="nb">print</span><span class="p">(</span><span class="n">epoch</span><span class="p">,</span> <span class="n">val_loss</span><span class="p">)</span>
+
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">FirstCNN</span><span class="p">()</span>
+<span class="n">fit</span><span class="p">(</span><span class="mi">20</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">F</span><span class="o">.</span><span class="n">cross_entropy</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">SGD</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">(),</span> <span class="n">lr</span><span class="o">=</span><span class="mf">0.1</span><span class="p">),</span> <span class="n">train_dl</span><span class="p">,</span> <span class="n">valid_dl</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;DON!&quot;</span><span class="p">)</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre>0 1.0546546453237533
+1 0.7579363002131383
+2 0.6592250390102466
+3 0.6393157167732716
+4 0.5863012673705816
+5 0.5547775803258022
+6 0.5493090981493394
+7 0.5114225192616383
+8 0.5704641215999922
+9 0.6606783599158128
+10 0.5425671192879478
+11 0.5549322261288762
+12 0.5536189061279099
+13 0.5563876662403345
+14 0.54101467885077
+15 0.5277495332310597
+16 0.5394995466123025
+17 0.5303962248315414
+18 0.53318738874048
+19 0.5385533541192611
+DON!
+</pre>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[64]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">matplotlib.pyplot</span> <span class="k">import</span> <span class="n">imshow</span>
+<span class="c1">#imshow(np.asarray(train[7][0]))</span>
+<span class="c1"># train[7]</span>
+<span class="kn">from</span> <span class="nn">torch.utils.data</span> <span class="k">import</span> <span class="n">TensorDataset</span>
+<span class="c1"># train_ds = TensorDataset(train.train_data, train.train_labels</span>
+<span class="c1"># TensorDataset(train)[:30000]</span>
+<span class="p">[</span><span class="n">method_name</span> <span class="k">for</span> <span class="n">method_name</span> <span class="ow">in</span> <span class="nb">dir</span><span class="p">(</span><span class="n">train</span><span class="p">)</span> <span class="k">if</span> <span class="n">callable</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">train</span><span class="p">,</span> <span class="n">method_name</span><span class="p">))]</span>
+<span class="c1"># len(train)</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[64]:</div>
+
+
+
+
+<div class="output_text output_subarea output_execute_result">
+<pre>[&#39;__add__&#39;,
+ &#39;__class__&#39;,
+ &#39;__delattr__&#39;,
+ &#39;__dir__&#39;,
+ &#39;__eq__&#39;,
+ &#39;__format__&#39;,
+ &#39;__ge__&#39;,
+ &#39;__getattribute__&#39;,
+ &#39;__getitem__&#39;,
+ &#39;__gt__&#39;,
+ &#39;__hash__&#39;,
+ &#39;__init__&#39;,
+ &#39;__init_subclass__&#39;,
+ &#39;__le__&#39;,
+ &#39;__len__&#39;,
+ &#39;__lt__&#39;,
+ &#39;__ne__&#39;,
+ &#39;__new__&#39;,
+ &#39;__reduce__&#39;,
+ &#39;__reduce_ex__&#39;,
+ &#39;__repr__&#39;,
+ &#39;__setattr__&#39;,
+ &#39;__sizeof__&#39;,
+ &#39;__str__&#39;,
+ &#39;__subclasshook__&#39;,
+ &#39;_check_exists&#39;,
+ &#39;download&#39;]</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[6]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span> 
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[37]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">from</span> <span class="nn">skorch</span> <span class="k">import</span> <span class="n">NeuralNetClassifier</span>
+<span class="n">net_regr</span> <span class="o">=</span> <span class="n">NeuralNetClassifier</span><span class="p">(</span>
+    <span class="n">module</span><span class="o">=</span><span class="n">FirstCNN</span><span class="p">,</span>
+    <span class="n">max_epochs</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>
+    <span class="n">lr</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>
+    <span class="n">criterion</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">NLLLoss</span><span class="p">,</span>
+<span class="c1">#     criterion__weight=weight,</span>
+    <span class="n">optimizer</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">SGD</span><span class="p">,</span>
+    <span class="n">optimizer__momentum</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span>
+<span class="c1">#     device=&#39;cuda&#39;,  # uncomment this to train with CUDA</span>
+<span class="p">)</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[30]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">train</span><span class="o">.</span><span class="n">train_labels</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[30]:</div>
+
+
+
+
+<div class="output_text output_subarea output_execute_result">
+<pre>tensor([1, 9, 0, 3, 2, 7, 5, 6, 4, 8])</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[34]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">train</span><span class="o">.</span><span class="n">train_data</span> <span class="o">=</span> <span class="n">train</span><span class="o">.</span><span class="n">train_data</span><span class="o">.</span><span class="n">type</span><span class="p">(</span><span class="s1">&#39;torch.FloatTensor&#39;</span><span class="p">)</span>
+<span class="n">net_regr</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">train</span><span class="o">.</span><span class="n">train_data</span><span class="p">,</span> <span class="n">train</span><span class="o">.</span><span class="n">train_labels</span><span class="p">)</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre>  epoch    train_loss    valid_acc    valid_loss      dur
+-------  ------------  -----------  ------------  -------
+      1           inf       0.1000      -16.1242  15.5629
+      2      -16.6445       0.1000      -17.0698  15.5948
+      3      -17.3730       0.1004      -17.6433  15.3967
+      4      -17.8578       0.1019      -18.0565  15.9598
+      5      -18.2226       0.1047      -18.3799  15.4213
+      6      -18.5153       0.1094      -18.6457  15.9111
+      7      -18.7600       0.1146      -18.8713  15.4875
+      8      -18.9701       0.1199      -19.0674  15.7156
+      9      -19.1544       0.1279      -19.2407  15.3496
+     10      -19.3184       0.1368      -19.3960  15.3957
+     11      -19.4662       0.1431      -19.5367  15.3407
+     12      -19.6007       0.1486      -19.6653  15.9689
+     13      -19.7241       0.1552      -19.7838  15.3812
+     14      -19.8381       0.1616      -19.8936  15.3919
+     15      -19.9441       0.1651      -19.9959  15.3365
+     16      -20.0430       0.1688      -20.0916  15.2849
+     17      -20.1359       0.1718      -20.1816  15.4344
+     18      -20.2233       0.1750      -20.2665  15.6929
+     19      -20.3058       0.1767      -20.3468  16.0031
+     20      -20.3841       0.1790      -20.4231  15.5811
+</pre>
+</div>
+</div>
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[34]:</div>
+
+
+
+
+<div class="output_text output_subarea output_execute_result">
+<pre>&lt;class &#39;skorch.classifier.NeuralNetClassifier&#39;&gt;[initialized](
+  module_=FirstCNN(
+    (conv1): Conv2d(1, 16, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1))
+    (conv2): Conv2d(16, 16, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1))
+    (conv3): Conv2d(16, 10, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1))
+  ),
+)</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[117]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">test</span><span class="o">.</span><span class="n">test_data</span> <span class="o">=</span> <span class="n">test</span><span class="o">.</span><span class="n">test_data</span><span class="o">.</span><span class="n">type</span><span class="p">(</span><span class="s1">&#39;torch.FloatTensor&#39;</span><span class="p">)</span>
+<span class="n">preds</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">test</span><span class="o">.</span><span class="n">test_data</span><span class="p">)</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[119]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">preds</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt output_prompt">Out[119]:</div>
+
+
+
+
+<div class="output_text output_subarea output_execute_result">
+<pre>tensor([[ 4.0686,  0.9486,  1.1147,  ..., 16.0540,  7.7589, 17.8792],
+        [ 4.8934,  3.0425, 10.1708,  ...,  0.6244,  2.9623,  1.0336],
+        [ 8.1671, 18.2464,  6.7151,  ...,  1.0052,  4.3644,  1.4280],
+        ...,
+        [ 4.0026,  4.2633,  5.2982,  ...,  2.3113, 12.9487,  3.0310],
+        [ 6.9058, 19.4025,  3.5864,  ...,  1.3586,  6.0631,  3.3358],
+        [ 1.8625,  0.0587,  2.2747,  ..., 11.4606,  9.0390,  6.7349]],
+       grad_fn=&lt;ViewBackward&gt;)</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[118]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">()</span>
+<span class="n">df</span><span class="p">[</span><span class="s1">&#39;Class&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">preds</span>
+<span class="n">df</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s1">&#39;Id&#39;</span>
+<span class="n">df</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="s1">&#39;submission1.csv&#39;</span><span class="p">)</span>
+<span class="n">df</span>
 </pre></div>
 
     </div>
@@ -13150,11 +13547,76 @@ div#notebook {
 <div class="output_subarea output_text output_error">
 <pre>
 <span class="ansi-red-fg">---------------------------------------------------------------------------</span>
-<span class="ansi-red-fg">TypeError</span>                                 Traceback (most recent call last)
-<span class="ansi-green-fg">&lt;ipython-input-5-0982751ec25b&gt;</span> in <span class="ansi-cyan-fg">&lt;module&gt;</span><span class="ansi-blue-fg">()</span>
-<span class="ansi-green-fg">----&gt; 1</span><span class="ansi-red-fg"> </span>FashionMNIST<span class="ansi-blue-fg">.</span>download<span class="ansi-blue-fg">(</span><span class="ansi-blue-fg">)</span>
+<span class="ansi-red-fg">RuntimeError</span>                              Traceback (most recent call last)
+<span class="ansi-green-fg">d:\program files\python37\lib\site-packages\pandas\core\frame.py</span> in <span class="ansi-cyan-fg">_ensure_valid_index</span><span class="ansi-blue-fg">(self, value)</span>
+<span class="ansi-green-intense-fg ansi-bold">   3172</span>             <span class="ansi-green-fg">try</span><span class="ansi-blue-fg">:</span>
+<span class="ansi-green-fg">-&gt; 3173</span><span class="ansi-red-fg">                 </span>value <span class="ansi-blue-fg">=</span> Series<span class="ansi-blue-fg">(</span>value<span class="ansi-blue-fg">)</span>
+<span class="ansi-green-intense-fg ansi-bold">   3174</span>             <span class="ansi-green-fg">except</span><span class="ansi-blue-fg">:</span>
 
-<span class="ansi-red-fg">TypeError</span>: download() missing 1 required positional argument: &#39;self&#39;</pre>
+<span class="ansi-green-fg">d:\program files\python37\lib\site-packages\pandas\core\series.py</span> in <span class="ansi-cyan-fg">__init__</span><span class="ansi-blue-fg">(self, data, index, dtype, name, copy, fastpath)</span>
+<span class="ansi-green-intense-fg ansi-bold">    274</span>                 data = _sanitize_array(data, index, dtype, copy,
+<span class="ansi-green-fg">--&gt; 275</span><span class="ansi-red-fg">                                        raise_cast_failure=True)
+</span><span class="ansi-green-intense-fg ansi-bold">    276</span> 
+
+<span class="ansi-green-fg">d:\program files\python37\lib\site-packages\pandas\core\series.py</span> in <span class="ansi-cyan-fg">_sanitize_array</span><span class="ansi-blue-fg">(data, index, dtype, copy, raise_cast_failure)</span>
+<span class="ansi-green-intense-fg ansi-bold">   4131</span>     <span class="ansi-green-fg">else</span><span class="ansi-blue-fg">:</span>
+<span class="ansi-green-fg">-&gt; 4132</span><span class="ansi-red-fg">         </span>subarr <span class="ansi-blue-fg">=</span> _try_cast<span class="ansi-blue-fg">(</span>data<span class="ansi-blue-fg">,</span> <span class="ansi-green-fg">False</span><span class="ansi-blue-fg">)</span>
+<span class="ansi-green-intense-fg ansi-bold">   4133</span> 
+
+<span class="ansi-green-fg">d:\program files\python37\lib\site-packages\pandas\core\series.py</span> in <span class="ansi-cyan-fg">_try_cast</span><span class="ansi-blue-fg">(arr, take_fast_path)</span>
+<span class="ansi-green-intense-fg ansi-bold">   4043</span>         <span class="ansi-green-fg">try</span><span class="ansi-blue-fg">:</span>
+<span class="ansi-green-fg">-&gt; 4044</span><span class="ansi-red-fg">             </span>subarr <span class="ansi-blue-fg">=</span> maybe_cast_to_datetime<span class="ansi-blue-fg">(</span>arr<span class="ansi-blue-fg">,</span> dtype<span class="ansi-blue-fg">)</span>
+<span class="ansi-green-intense-fg ansi-bold">   4045</span>             <span class="ansi-red-fg"># Take care in creating object arrays (but iterators are not</span>
+
+<span class="ansi-green-fg">d:\program files\python37\lib\site-packages\pandas\core\dtypes\cast.py</span> in <span class="ansi-cyan-fg">maybe_cast_to_datetime</span><span class="ansi-blue-fg">(value, dtype, errors)</span>
+<span class="ansi-green-intense-fg ansi-bold">   1087</span>                                     value.dtype == np.object_)):
+<span class="ansi-green-fg">-&gt; 1088</span><span class="ansi-red-fg">             </span>value <span class="ansi-blue-fg">=</span> maybe_infer_to_datetimelike<span class="ansi-blue-fg">(</span>value<span class="ansi-blue-fg">)</span>
+<span class="ansi-green-intense-fg ansi-bold">   1089</span> 
+
+<span class="ansi-green-fg">d:\program files\python37\lib\site-packages\pandas\core\dtypes\cast.py</span> in <span class="ansi-cyan-fg">maybe_infer_to_datetimelike</span><span class="ansi-blue-fg">(value, convert_dates)</span>
+<span class="ansi-green-intense-fg ansi-bold">    894</span>         v <span class="ansi-blue-fg">=</span> <span class="ansi-blue-fg">[</span>v<span class="ansi-blue-fg">]</span>
+<span class="ansi-green-fg">--&gt; 895</span><span class="ansi-red-fg">     </span>v <span class="ansi-blue-fg">=</span> np<span class="ansi-blue-fg">.</span>array<span class="ansi-blue-fg">(</span>v<span class="ansi-blue-fg">,</span> copy<span class="ansi-blue-fg">=</span><span class="ansi-green-fg">False</span><span class="ansi-blue-fg">)</span>
+<span class="ansi-green-intense-fg ansi-bold">    896</span> 
+
+<span class="ansi-green-fg">d:\program files\python37\lib\site-packages\torch\tensor.py</span> in <span class="ansi-cyan-fg">__array__</span><span class="ansi-blue-fg">(self, dtype)</span>
+<span class="ansi-green-intense-fg ansi-bold">    449</span>         <span class="ansi-green-fg">if</span> dtype <span class="ansi-green-fg">is</span> <span class="ansi-green-fg">None</span><span class="ansi-blue-fg">:</span>
+<span class="ansi-green-fg">--&gt; 450</span><span class="ansi-red-fg">             </span><span class="ansi-green-fg">return</span> self<span class="ansi-blue-fg">.</span>numpy<span class="ansi-blue-fg">(</span><span class="ansi-blue-fg">)</span>
+<span class="ansi-green-intense-fg ansi-bold">    451</span>         <span class="ansi-green-fg">else</span><span class="ansi-blue-fg">:</span>
+
+<span class="ansi-red-fg">RuntimeError</span>: Can&#39;t call numpy() on Variable that requires grad. Use var.detach().numpy() instead.
+
+During handling of the above exception, another exception occurred:
+
+<span class="ansi-red-fg">ValueError</span>                                Traceback (most recent call last)
+<span class="ansi-green-fg">&lt;ipython-input-118-bd0741545927&gt;</span> in <span class="ansi-cyan-fg">&lt;module&gt;</span><span class="ansi-blue-fg">()</span>
+<span class="ansi-green-intense-fg ansi-bold">      1</span> df <span class="ansi-blue-fg">=</span> pd<span class="ansi-blue-fg">.</span>DataFrame<span class="ansi-blue-fg">(</span><span class="ansi-blue-fg">)</span>
+<span class="ansi-green-fg">----&gt; 2</span><span class="ansi-red-fg"> </span>df<span class="ansi-blue-fg">[</span><span class="ansi-blue-fg">&#39;Class&#39;</span><span class="ansi-blue-fg">]</span> <span class="ansi-blue-fg">=</span> preds
+<span class="ansi-green-intense-fg ansi-bold">      3</span> df<span class="ansi-blue-fg">.</span>index<span class="ansi-blue-fg">.</span>name <span class="ansi-blue-fg">=</span> <span class="ansi-blue-fg">&#39;Id&#39;</span>
+<span class="ansi-green-intense-fg ansi-bold">      4</span> df<span class="ansi-blue-fg">.</span>to_csv<span class="ansi-blue-fg">(</span><span class="ansi-blue-fg">&#39;submission1.csv&#39;</span><span class="ansi-blue-fg">)</span>
+<span class="ansi-green-intense-fg ansi-bold">      5</span> df
+
+<span class="ansi-green-fg">d:\program files\python37\lib\site-packages\pandas\core\frame.py</span> in <span class="ansi-cyan-fg">__setitem__</span><span class="ansi-blue-fg">(self, key, value)</span>
+<span class="ansi-green-intense-fg ansi-bold">   3117</span>         <span class="ansi-green-fg">else</span><span class="ansi-blue-fg">:</span>
+<span class="ansi-green-intense-fg ansi-bold">   3118</span>             <span class="ansi-red-fg"># set column</span>
+<span class="ansi-green-fg">-&gt; 3119</span><span class="ansi-red-fg">             </span>self<span class="ansi-blue-fg">.</span>_set_item<span class="ansi-blue-fg">(</span>key<span class="ansi-blue-fg">,</span> value<span class="ansi-blue-fg">)</span>
+<span class="ansi-green-intense-fg ansi-bold">   3120</span> 
+<span class="ansi-green-intense-fg ansi-bold">   3121</span>     <span class="ansi-green-fg">def</span> _setitem_slice<span class="ansi-blue-fg">(</span>self<span class="ansi-blue-fg">,</span> key<span class="ansi-blue-fg">,</span> value<span class="ansi-blue-fg">)</span><span class="ansi-blue-fg">:</span>
+
+<span class="ansi-green-fg">d:\program files\python37\lib\site-packages\pandas\core\frame.py</span> in <span class="ansi-cyan-fg">_set_item</span><span class="ansi-blue-fg">(self, key, value)</span>
+<span class="ansi-green-intense-fg ansi-bold">   3191</span>         &#34;&#34;&#34;
+<span class="ansi-green-intense-fg ansi-bold">   3192</span> 
+<span class="ansi-green-fg">-&gt; 3193</span><span class="ansi-red-fg">         </span>self<span class="ansi-blue-fg">.</span>_ensure_valid_index<span class="ansi-blue-fg">(</span>value<span class="ansi-blue-fg">)</span>
+<span class="ansi-green-intense-fg ansi-bold">   3194</span>         value <span class="ansi-blue-fg">=</span> self<span class="ansi-blue-fg">.</span>_sanitize_column<span class="ansi-blue-fg">(</span>key<span class="ansi-blue-fg">,</span> value<span class="ansi-blue-fg">)</span>
+<span class="ansi-green-intense-fg ansi-bold">   3195</span>         NDFrame<span class="ansi-blue-fg">.</span>_set_item<span class="ansi-blue-fg">(</span>self<span class="ansi-blue-fg">,</span> key<span class="ansi-blue-fg">,</span> value<span class="ansi-blue-fg">)</span>
+
+<span class="ansi-green-fg">d:\program files\python37\lib\site-packages\pandas\core\frame.py</span> in <span class="ansi-cyan-fg">_ensure_valid_index</span><span class="ansi-blue-fg">(self, value)</span>
+<span class="ansi-green-intense-fg ansi-bold">   3173</span>                 value <span class="ansi-blue-fg">=</span> Series<span class="ansi-blue-fg">(</span>value<span class="ansi-blue-fg">)</span>
+<span class="ansi-green-intense-fg ansi-bold">   3174</span>             <span class="ansi-green-fg">except</span><span class="ansi-blue-fg">:</span>
+<span class="ansi-green-fg">-&gt; 3175</span><span class="ansi-red-fg">                 raise ValueError(&#39;Cannot set a frame with no defined index &#39;
+</span><span class="ansi-green-intense-fg ansi-bold">   3176</span>                                  <span class="ansi-blue-fg">&#39;and a value that cannot be converted to a &#39;</span>
+<span class="ansi-green-intense-fg ansi-bold">   3177</span>                                  &#39;Series&#39;)
+
+<span class="ansi-red-fg">ValueError</span>: Cannot set a frame with no defined index and a value that cannot be converted to a Series</pre>
 </div>
 </div>
 
