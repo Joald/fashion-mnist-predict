@@ -28,14 +28,14 @@ train_dl = DataLoader(TensorDataset(train_X, torch.cat(ys, 0)), batch_size=30)
 # valid[0].size(), valid[1].size()
 
 
-# In[116]:
+# In[137]:
 
 
 import numpy as np
 from torch.utils.data import DataLoader
 import torch.nn as nn
 import torch.nn.functional as F
-
+from sklearn.metrics import accuracy_score
 
 class FirstCNN(nn.Module):
     def __init__(self):
@@ -65,6 +65,14 @@ def loss_batch(model, loss_func, xb, yb, opt=None):
 
     return loss.item(), len(xb)
 
+def accuracy(model, valid_dl):
+    reals = []
+    preds = []
+    for xb, yb in valid_dl:
+        reals.append(yb)
+        preds.append(model(xb).argmax(dim=1))
+    return accuracy_score(torch.cat(reals, 0), torch.cat(preds, 0))
+
 def fit(epochs, model, loss_func, opt, train_dl, valid_dl):
     for epoch in range(epochs):
         model.train()
@@ -74,17 +82,23 @@ def fit(epochs, model, loss_func, opt, train_dl, valid_dl):
         model.eval()
         with torch.no_grad():
             losses, nums = zip(*[loss_batch(model, loss_func, xb, yb) for xb, yb in valid_dl])
-        val_loss = np.sum(np.multiply(losses, nums)) / np.sum(nums)
+            val_loss = np.sum(np.multiply(losses, nums)) / np.sum(nums)
 
-        print(epoch, val_loss)
+            print("Epoch %s: loss=%s, val_acc=%s, train_acc=%s" % (epoch, val_loss, accuracy(model, valid_dl), accuracy(model, train_dl)))
 
 
+def initer(layer):
+    if type(layer) == nn.Conv2d:
+        nn.init.kaiming_normal_(layer.weight)
+            
 model = FirstCNN()
-fit(20, model, F.cross_entropy, torch.optim.SGD(model.parameters(), lr=0.1), train_dl, valid_dl)
+model.apply(initer)
+fit(20, model, F.cross_entropy, torch.optim.Adam(model.parameters()), train_dl, valid_dl)
 print("DON!")
+#no momentum: loss=0.4727671396235625, val_acc=0.8349444444444445, train_acc=0.8478333333333333
 
 
-# In[64]:
+# In[141]:
 
 
 import numpy as np
@@ -94,14 +108,8 @@ from matplotlib.pyplot import imshow
 from torch.utils.data import TensorDataset
 # train_ds = TensorDataset(train.train_data, train.train_labels
 # TensorDataset(train)[:30000]
-[method_name for method_name in dir(train) if callable(getattr(train, method_name))]
+# [method_name for method_name in dir(train) if callable(getattr(train, method_name))]
 # len(train)
-
-
-# In[6]:
-
-
-
 
 
 # In[37]:
@@ -134,26 +142,26 @@ train.train_data = train.train_data.type('torch.FloatTensor')
 net_regr.fit(train.train_data, train.train_labels)
 
 
-# In[117]:
+# In[138]:
 
 
 test.test_data = test.test_data.type('torch.FloatTensor')
 preds = model(test.test_data)
 
 
-# In[119]:
+# In[139]:
 
 
-preds
+preds = preds.argmax(dim=1)
 
 
-# In[118]:
+# In[140]:
 
 
 import pandas as pd
 df = pd.DataFrame()
 df['Class'] = preds
 df.index.name = 'Id'
-df.to_csv('submission1.csv')
+df.to_csv('submission.csv')
 df
 
