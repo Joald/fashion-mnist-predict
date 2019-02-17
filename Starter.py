@@ -1,15 +1,19 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[277]:
+# In[208]:
 
 
+import torch
 from torchvision.datasets import FashionMNIST
 from torch.utils.data import DataLoader, TensorDataset
+from contextlib import contextmanager
+import numpy as np
+import torch.nn as nn
+import torch.nn.functional as F
+from sklearn.metrics import accuracy_score
 
-train = FashionMNIST('.', download=True, train=True)
-n = len(train)
-valid_n = n * 3 // 10
+
 cuda = torch.device("cuda")
 cpu = torch.device("cpu")
 dev = cpu #cuda if torch.cuda.is_available() else cpu
@@ -24,9 +28,6 @@ def switch_to_cpu(model):
     dev = _dev
     model.to(dev)
 
-def preprocess(x, y):
-    return x.view(-1, 1, 28, 28).to(dev), y.to(dev)
-
 class WrappedDataLoader:
     def __init__(self, dl, func):
         self.dl = dl
@@ -39,25 +40,6 @@ class WrappedDataLoader:
         for b in self.dl:
             yield (self.func(*b))
 
-def get_dl(xs, ys, bs=30):
-    return WrappedDataLoader(DataLoader(TensorDataset(xs.type(torch.float32), ys), batch_size=bs), preprocess)
-
-valid_dl = get_dl(train.train_data[:valid_n], train.train_labels[:valid_n])
-train_dl = get_dl(train.train_data[valid_n:], train.train_labels[valid_n:])
-
-torch.manual_seed(2137)
-torch.cuda.manual_seed_all(213742069)
-torch.cuda.manual_seed(213742069)
-
-
-# In[253]:
-
-
-import numpy as np
-import torch.nn as nn
-import torch.nn.functional as F
-from sklearn.metrics import accuracy_score
-
 # The following is adapted from:
 # https://pytorch.org/tutorials/beginner/nn_tutorial.html
 
@@ -68,21 +50,18 @@ class Lambda(nn.Module):
 
     def forward(self, x):
         return self.func(x)
-
-
-def get_model():
+    
+def get_model(n_classes=10):
     return nn.Sequential(
         nn.Conv2d(1, 16, kernel_size=3, stride=2, padding=1),
         nn.ReLU(),
         nn.Conv2d(16, 16, kernel_size=3, stride=2, padding=1),
         nn.ReLU(),
-        nn.Conv2d(16, 10, kernel_size=3, stride=2, padding=1),
-        nn.AvgPool2d(4),
+        nn.Conv2d(16, n_classes, kernel_size=3, stride=2, padding=1),
+        nn.AdaptiveMaxPool2d(1),
         Lambda(lambda x: x.view(x.size(0), -1)),
     )
-    
 
-lr = 0.1
 
 def loss_batch(model, loss_func, xb, yb, opt=None):
     loss = loss_func(model(xb), yb)
@@ -94,116 +73,244 @@ def loss_batch(model, loss_func, xb, yb, opt=None):
 
     return loss.item(), len(xb)
 
-def accuracy(model, valid_dl):
+def predict_batch(model, data_loader):
     reals = []
     preds = []
-    for xb, yb in valid_dl:
+    for xb, yb in data_loader:
         reals.append(yb)
         preds.append(model(xb).argmax(dim=1))
-    
-    return accuracy_score(torch.cat(reals, 0), torch.cat(preds, 0))
+        
+    return (torch.cat(reals, 0), torch.cat(preds, 0))
 
-def fit(model, loss_func, opt, train_dl, valid_dl):
-    last_loss = 2137.
+def accuracy(model, data_loader):
+    return accuracy_score(*predict_batch(model, data_loader))
+
+
+def loss(model, loss_func, data_loader):
+    losses, nums = zip(*[loss_batch(model, loss_func, xb, yb) for xb, yb in data_loader])
+    return np.sum(np.multiply(losses, nums)) / np.sum(nums)
+
+def fit(model, loss_func, opt, train_dl, *, valid_dl=None, max_epochs=20, threshold=1e-6, min_epochs=None):
+    validation = valid_dl is not None
+    print("Fitting a model...")
+    last_loss = float("inf")
     epoch = 1
+    accuracies = []
+    losses = []
     while True:
         model.train()
         for xb, yb in train_dl:
-#             print(model(xb).size())
-#             assert False
             loss_batch(model, loss_func, xb, yb, opt)
-
         model.eval()
+        
         with torch.no_grad(), switch_to_cpu(model):
             # print diagnostics about current epoch
-            losses, nums = zip(*[loss_batch(model, loss_func, xb, yb) for xb, yb in valid_dl])
-            val_loss = np.sum(np.multiply(losses, nums)) / np.sum(nums)
-
-            print("Epoch %s: val_loss=%s, val_acc=%s, train_acc=%s" % (epoch, val_loss, accuracy(model, valid_dl), accuracy(model, train_dl)))
-        if last_loss - val_loss < 0.00001:
-            print("delta loss was %s, stopping" % (last_loss - val_loss))
+            if validation:
+                val_loss = loss(model, loss_func, valid_dl)
+                val_acc = accuracy(model, valid_dl)
+            train_loss = loss(model, loss_func, train_dl)
+            train_acc = accuracy(model, train_dl)
+        if validation:
+            print("Epoch %s: val_loss=%s, train_loss=%s, val_acc=%s, train_acc=%s" % (epoch, val_loss, train_loss, val_acc, train_acc))
+        else:
+            print("Epoch %s: train_loss=%s, train_acc=%s" % (epoch, train_loss, train_acc))
+        
+        losses.append((val_loss, train_loss) if validation else train_loss)
+        accuracies.append((val_acc, train_acc) if validation else train_acc)
+        
+        compare_loss = (val_loss if validation else train_loss)
+        min_epochs_satisified = min_epochs is None or epoch >= min_epochs
+        if threshold and last_loss - compare_loss < threshold and min_epochs_satisified:
+            print("delta loss %s was lower than threshold %s, stopping" % (last_loss - compare_loss, threshold))
             break
-        last_loss = val_loss
+        
+        if max_epochs is not None and epoch >= max_epochs and min_epochs_satisified:
+            print("Max epochs reached, stopping")
+            break
+        last_loss = compare_loss
         epoch += 1
+    return losses, accuracies
+
 
 def initer(layer):
     if type(layer) == nn.Conv2d:
         nn.init.kaiming_normal_(layer.weight)
 
-model = get_model()
-model.to(dev)
-model.apply(initer)
-fit(model, F.cross_entropy, torch.optim.Adam(model.parameters()), train_dl, valid_dl)
+# Train models
+        
+boots = [5, 7, 9]
+not_boots = [i for i in range(10) if i not in boots]
+
+def preprocess(x, y):
+    return x.view(-1, 1, 28, 28).to(dev), y.to(dev)
+
+def prep_ens(x, y):
+    for i in range(10):
+        y[y == i] = int(i in boots)
+    return preprocess(x, y)
+
+def prep_indexer(indexer):
+    def prep(x, y):
+        for i, k in enumerate(indexer):
+            y[y == k] = i
+        return preprocess(x, y)
+    return prep
+
+def get_dl(xs, ys, prep, bs=30):
+    return WrappedDataLoader(DataLoader(TensorDataset(xs.type(torch.float32), ys), batch_size=bs), prep)
+
+def get_dls(xs, ys, prep, bs=30):
+    n = len(ys) * 3 // 10
+    return {'train': get_dl(xs[:n], ys[:n], prep, bs), 'valid': get_dl(xs[n:], ys[n:], prep, bs)}
+
+    
+
+# torch.manual_seed_all(213742069)
+torch.manual_seed(213742069)
+
+torch.cuda.manual_seed_all(213742069)
+torch.cuda.manual_seed(213742069)
+
+
+train = FashionMNIST('.', download=True, train=True)
+
+data_loaders = [get_dls(train.train_data, train.train_labels, prep_ens)]
+
+mask_y = torch.stack([train.train_labels == i for i in boots]).max(dim=0)[0]
+mask_x = mask_y.view(-1, 1, 1).repeat(1, 28, 28)
+
+data_loaders.append(get_dls(train.train_data.masked_select(mask_x).view(-1, 28, 28), train.train_labels.masked_select(mask_y), prep_indexer(boots)))
+mask_x, mask_y = 1 - mask_x, 1 - mask_y
+data_loaders.append(get_dls(train.train_data.masked_select(mask_x).view(-1, 28, 28), train.train_labels.masked_select(mask_y), prep_indexer(not_boots)))
+
+models = [get_model(2), get_model(3), get_model(7)]
+min_epochs = [5, 20, 20]
+max_epochs = [7, 25, None]
+results = []
+for model, dl, min_epoch, max_epoch in zip(models, data_loaders, min_epochs, max_epochs):
+    model.to(dev)
+    model.apply(initer)
+    train_dl, valid_dl = (dl, None) if dl.__class__ == WrappedDataLoader else dl
+    result = fit(
+        model,
+        F.cross_entropy,
+        torch.optim.Adam(model.parameters()), 
+        dl['train'], 
+        valid_dl=dl['valid'], 
+        max_epochs=50, 
+#         min_epochs=min_epoch,
+        threshold=None
+    )
+    results.append(result)
 print("DONE!")
-# SGD : val_loss=0.4727671396235625,  val_acc=0.8349444444444445, train_acc=0.8478333333333333
-# Adam: val_loss=0.43147962642212706, val_acc=0.8516666666666667, train_acc=0.8738809523809524
-# Seq : val_loss=0.43787566319108007, val_acc=0.8512222222222222, train_acc=0.8717142857142857
-# cuda: val_loss=0.4572788599754373,  val_acc=0.8385555555555556, train_acc=0.8583095238095239
-# 2137: val_loss=0.4622961250692606,  val_acc=0.8357777777777777, train_acc=0.8569761904761904
-# cpu : stride=1 -> not worth trying
-#     : val_loss=0.5751239460210006,  val_acc=0.7962777777777778, train_acc=0.8186904761904762 - maxpool
-#     : val_loss=0.4394427917525172,  val_acc=0.8492222222222222, train_acc=0.8715238095238095 - early
-#     : val_loss=0.43841269160310425, val_acc=0.8505,             train_acc=0.8701428571428571 - real early
 
 
-# In[232]:
+# In[303]:
 
 
-torch.cuda.device_count()
+for i, (title, ylimits) in enumerate(zip(['Loss', 'Accuracy'], [(0., 0.9), (0.68, 1.01)])):
+    plt.figure(figsize=(16, 9))
+    for acc, label in zip(results[:, i], ['binary', 'boot', 'non_boot']):
+        plt.plot(acc[:, 0], label=label + '_valid')
+        plt.plot(acc[:, 1], label=label + '_train')
+    plt.ylim(*ylimits)
+    plt.title(title)
+    plt.xlabel('epoch')
+    plt.ylabel(title.lower())
+    plt.legend()
+    plt.show()
 
 
-# In[37]:
+# In[301]:
 
 
-import torch
-from skorch import NeuralNetClassifier
-net_regr = NeuralNetClassifier(
-    module=FirstCNN,
-    max_epochs=20,
-    lr=0.1,
-    criterion=nn.CrossEntr,
-#     criterion__weight=weight,
-    optimizer=torch.optim.Adam,
-    optimizer__momentum=0.9,
-#     device='cuda',  # uncomment this to train with CUDA
-)
+def predict(X):
+    X1 = models[0](X)
+    X1 = X1.argmax(dim=1)
+    X2 = []
+    for i, x in enumerate(X1):
+#         print(X[i].size())
+#         X2.append(models[2 - x](X[i].view(1, 1, 28, 28)).argmax(dim=1).item())
+        val = models[2 - x](X[i].view(1, 1, 28, 28)).argmax(dim=1).item()
+        X2.append(boots[val] if i == 1 else not_boots[val])
+    return torch.tensor(X2)
+
+test = FashionMNIST('.', download=True, train=False)
+test_dl = get_dl(test.test_data, torch.ones(test.test_data.size(0)), preprocess, 10000)
+preds = predict(next(iter(test_dl))[0])
+
+preds.size(), preds
 
 
-# In[30]:
+# In[302]:
 
 
-train.train_labels.unique()
+accuracy_score(preds, test.test_labels.numpy())
 
 
-# In[34]:
+# In[205]:
 
 
-train.train_data = train.train_data.type('torch.FloatTensor')
-net_regr.fit(train.train_data, train.train_labels)
+def get_dls(xs, ys, prep, bs=30):
+    n = len(ys) * 3 // 10
+    return {'train': get_dl(xs[:n], ys[:n], prep, bs), 'valid': get_dl(xs[n:], ys[n:], prep, bs)}
+
+get_dls(train.train_data, train.train_labels, prep_ens)
 
 
-# In[278]:
+# In[297]:
+
+
+results_[0].shape
+
+
+# In[288]:
+
+
+results = Out[i]
+
+
+# In[279]:
 
 
 test = FashionMNIST('.', download=True, train=False)
 test_dl = get_dl(test.test_data, torch.ones(test.test_data.size(0)), 10000)
-# preds = model()
-next(iter(test_dl))[0].size()
-
-
-# In[139]:
-
-
+preds = model(next(iter(test_dl))[0])
 preds = preds.argmax(dim=1)
-
-
-# In[140]:
-
-
 import pandas as pd
 df = pd.DataFrame()
 df['Class'] = preds
 df.index.name = 'Id'
 df.to_csv('submission.csv')
 df
+
+
+# In[280]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+import torch
+from skorch import NeuralNetClassifier
+net_regr = NeuralNetClassifier(
+    module=get_model,
+    max_epochs=20,
+    lr=1e-6,
+    criterion=nn.CrossEntropyLoss,
+#     criterion__weight=weight,
+    optimizer=torch.optim.Adam,
+#     device='cuda',  # uncomment this to train with CUDA
+)
+X, y = next(iter(get_dl(train.train_data, train.train_labels, preprocess, bs=100000)))
+net_regr.fit(X, y)
 
