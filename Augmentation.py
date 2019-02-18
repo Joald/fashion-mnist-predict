@@ -1,13 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[325]:
-
-
-
-
-
-# In[392]:
+# In[374]:
 
 
 import torch
@@ -55,14 +49,13 @@ class Lambda(nn.Module):
 
 
 def get_model():
-    layer_size = 16
     return nn.Sequential(
-        nn.Conv2d(1, layer_size, kernel_size=3, stride=2, padding=1),
+        nn.Conv2d(1, 16, kernel_size=3, stride=2, padding=1),
         nn.ReLU(),
-        nn.Conv2d(layer_size, layer_size, kernel_size=3, stride=2, padding=1),
+        nn.Conv2d(16, 16, kernel_size=3, stride=2, padding=1),
         nn.ReLU(),
-        nn.Conv2d(layer_size, 10, kernel_size=3, stride=2, padding=1),
-        nn.AdaptiveAvgPool2d(1),
+        nn.Conv2d(16, 10, kernel_size=3, stride=2, padding=1),
+        nn.AvgPool2d(4),
         Lambda(lambda x: x.view(x.size(0), -1)),
     )
 
@@ -75,7 +68,7 @@ def loss_batch(model, loss_func, xb, yb, opt=None):
         opt.step()
         opt.zero_grad()
 
-    return loss.item(), float(len(xb))
+    return loss.item(), len(xb)
 
 def predict_batch(model, data_loader):
     reals = []
@@ -83,22 +76,17 @@ def predict_batch(model, data_loader):
     for xb, yb in data_loader:
         reals.append(yb)
         preds.append(model(xb).argmax(dim=1))
-    
-    return torch.cat(reals, 0), torch.cat(preds, 0)
+        
+    return (torch.cat(reals, 0), torch.cat(preds, 0))
 
 def accuracy(model, data_loader):
-    y_true, y_pred = predict_batch(model, data_loader)
-    return torch.nonzero(y_true == y_pred).size(0) / y_pred.size(0)
+    return accuracy_score(*predict_batch(model, data_loader))
 
 def loss(model, loss_func, data_loader):
-    losses = []
-    nums = []
-    for xb, yb in data_loader:
-        l, n = loss_batch(model, loss_func, xb, yb)
-        losses.append(l)
-        nums.append(n)
-    nums = torch.tensor(nums)
-    return (torch.tensor(losses).mul(nums).sum() / nums.sum()).item()
+    losses, nums = zip(*[loss_batch(model, loss_func, xb, yb) for xb, yb in data_loader])
+    return np.sum(np.multiply(losses, nums)) / np.sum(nums)
+
+
 
 def fit(model, loss_func, opt, train_dl, *, valid_dl=None, max_epochs=20, threshold=1e-6, min_epochs=None, silent=False):
     validation = valid_dl is not None
@@ -113,7 +101,7 @@ def fit(model, loss_func, opt, train_dl, *, valid_dl=None, max_epochs=20, thresh
             loss_batch(model, loss_func, xb, yb, opt)
         model.eval()
         
-        with torch.no_grad():
+        with torch.no_grad(), switch_to_cpu(model):
             # print diagnostics about current epoch
             if validation:
                 val_loss = loss(model, loss_func, valid_dl)
@@ -149,52 +137,157 @@ def preprocess(x, y):
     return x.view(-1, 1, 28, 28).to(dev), y.to(dev)
 
 def get_dl(xs, ys, prep=preprocess, bs=30):
-    return WrappedDataLoader(DataLoader(TensorDataset(xs.type(torch.float32) / 255, ys), batch_size=bs), prep)
+    return WrappedDataLoader(DataLoader(TensorDataset(xs.type(torch.float32), ys), batch_size=bs), prep)
 
 def get_dls(xs, ys, prep=preprocess, bs=30):
     n = len(ys) // 5
     return {'valid': get_dl(xs[:n], ys[:n], prep, bs), 'train': get_dl(xs[n:], ys[n:], prep, bs)}
-        
+  
 
 
-# In[ ]:
+# In[476]:
 
 
+import numpy as np
+import torch
 
-
-
-# In[393]:
-
-
+import torchvision.transforms as tt
+import torchvision.transforms.functional as tf
+from random_erasing import RandomErasing
 torch.manual_seed(213742069)
 torch.cuda.manual_seed_all(213742069)
 torch.cuda.manual_seed(213742069)
 train = FashionMNIST('.', download=True, train=True)
-first_model = get_model()
-first_model.to(dev)
-dls = get_dls(train.train_data, train.train_labels, bs=30)
-results = fit(first_model, F.cross_entropy, torch.optim.Adam(first_model.parameters()), dls['train'], valid_dl=dls['valid'], min_epochs=50, max_epochs=50)
+model = get_model()
+model.to(dev)
 
+aff = tt.Compose([
+    tt.RandomAffine(0, translate=(1 / 10, 1/10), shear=10, fillcolor=0),
+    tt.ToTensor()
+])
+re = tt.Compose([
+    Lambda(lambda z: z.view(1, 28, 28)),
+    RandomErasing(1, sl=0.01, sh=0.05),
+])
+
+xs = train.train_data.type(torch.FloatTensor)
+ys = train.train_labels
+xs2 = []
+ys2 = []
+worse_ones = [3, 4, 5,7,  9]
+boots = [5, 7, 9]
+
+for x, y in zip(xs, ys):
+    mod = re(x.clone())
+    if torch.any(mod != x): 
+        xs2.append(mod)
+        ys2.append(y)
+#     if y not in worse_ones:
+
+
+xs = torch.cat([xs, torch.cat(xs2)])
+ys = torch.cat([ys, torch.tensor(ys2)])
+print("Augmented!")
+xs, ys = next(iter(DataLoader(TensorDataset(xs, ys), shuffle=True, batch_size=100000000)))
+dls = get_dls(xs, ys)
+results = fit(model, F.cross_entropy, torch.optim.Adam(model.parameters()), dls['train'], valid_dl=dls['valid'], min_epochs=50, max_epochs=100)
 print("DONE!")
+# Epoch 51: val_loss=0.4049692894394199, train_loss=0.35769767411674064, val_acc=0.8584444444444445, train_acc=0.8688194444444445
 
 
-# In[350]:
+
+# In[163]:
 
 
-xs, ys = train.train_data, train.train_labels
-DataLoader(TensorDataset(xs.type(torch.float32), ys), batch_size=30).__dict__.items()
+aff = tt.Compose([
+    Lambda(lambda x: x.view(1, 28, 28)),
+    tt.ToPILImage(),
+    tt.RandomAffine(0, translate=(1 / 100, 1/100), shear=(-2, 2), fillcolor=0),
+    tt.ToTensor(),
+    Lambda(lambda x: x.view(28, 28)),
+])
 
 
-# In[399]:
+# In[485]:
+
+
+train = FashionMNIST('.', download=True, train=True)
+aff = tt.Compose([
+    Lambda(lambda x: x.view(1, 28, 28)),
+    tt.ToPILImage(),
+    tt.RandomAffine(0, translate=(1 / 10, 1/10), shear=10, fillcolor=0),
+    tt.ToTensor(),
+    Lambda(lambda x: x.view(28, 28)),
+])
+x = train.train_data[0]
+plt.imshow(x)
+plt.show()
+re = tt.Compose([
+    Lambda(lambda z: z.view(1, 28, 28)),
+    RandomErasing(1, sl=0.01, sh=0.05),
+    Lambda(lambda z: z.view(28, 28)),
+])
+y = re(x.clone())
+plt.imshow(y)
+plt.show()
+(y.type(torch.FloatTensor) - x.type(torch.FloatTensor)).abs().sum() 
+
+
+# In[478]:
+
+
+with switch_to_cpu(model):
+    preds = model(next(iter(get_dl(train.train_data, train.train_labels, preprocess, 10000000)))[0]).argmax(dim=1)
+    acc = accuracy_score(train.train_labels, preds)
+plt.figure(figsize=(16, 9))
+plt.pie([acc, 1 - acc])
+plt.title("Full train + valid accuracy: %s" % acc) 
+plt.show()
+
+
+# In[486]:
+
+
+categorized = np.array([[x for x, y in zip(images, labels) if y == i] for i in range(10)])
+str_labels = [
+ 'T-shirt/top',
+ 'Trouser',
+ 'Pullover',
+ 'Dress',
+ 'Coat',
+ 'Sandal',
+ 'Shirt',
+ 'Sneaker',
+ 'Bag',
+ 'Ankle boot'
+]
+
+with switch_to_cpu(model):
+    acc = []
+    for y, xs in enumerate(categorized):
+        n = len(xs)
+        ys = y * torch.ones(n)
+        xs = next(iter(get_dl(torch.from_numpy(xs), ys, preprocess, n)))[0]
+        acc.append(accuracy_score(ys, model(xs).argmax(dim=1)))
+
+plt.figure(figsize=(16, 9))
+plt.bar(str_labels, acc - baseline)
+plt.xlabel('classes')
+plt.ylabel('accuracy')
+plt.title('Class accuracies')
+plt.show()
+
+
+# In[484]:
 
 
 acc = []
-
-for y, xs in enumerate(categorized):
-    n = len(xs)
-    ys = y * torch.ones(n, dtype=torch.long)
-#     xs = next(iter(get_dl(torch.from_numpy(xs), ys, preprocess, n)))[0]
-    acc.append(accuracy(first_model, get_dl(torch.from_numpy(xs), ys, preprocess, n)))
+with switch_to_cpu(model):
+    for y, xs in enumerate(categorized):
+        n = len(xs)
+        ys = y * torch.ones(n)
+        xs = next(iter(get_dl(torch.from_numpy(xs), ys, preprocess, n)))[0]
+        acc.append(accuracy_score(ys, model(xs).argmax(dim=1)))
 
 plt.figure(figsize=(16, 9))
 plt.bar(str_labels, acc)
@@ -206,41 +299,6 @@ plt.title('Class accuracies')
 plt.show()
 
 
-# In[309]:
-
-
-with switch_to_cpu(first_model):
-    preds = first_model(next(iter(get_dl(train.train_data, train.train_labels, preprocess, 10000000)))[0]).argmax(dim=1)
-    acc = accuracy_score(train.train_labels, preds)
-plt.figure(figsize=(16, 9))
-plt.pie([acc, 1 - acc])
-plt.title("Full train + valid accuracy: %s" % acc) 
-plt.show()
-
-
-# In[310]:
-
-
-for i, (title, ylimits) in enumerate(zip(['Loss', 'Accuracy'], [(0.3, 0.57), (0.80, 0.9)])):
-    plt.style.use('fivethirtyeight')
-    plt.figure(figsize=(16, 9))
-    plt.plot(results[i, :, 0], label='valid')
-    plt.plot(results[i, :, 1], label='train')
-    plt.ylim(*ylimits)
-    plt.title(title)
-    plt.xlabel('epoch')
-    plt.ylabel(title.lower())
-    plt.legend()
-    plt.show()
-
-
-# In[371]:
-
-
-x = train.train_data[0]
-x
-
-
 # In[ ]:
 
 
@@ -253,13 +311,13 @@ x
 
 
 
-# In[279]:
-
+# In[487]:
 
 
 test = FashionMNIST('.', download=True, train=False)
-test_dl = get_dl(test.test_data, torch.ones(test.test_data.size(0)), 10000)
-preds = model(next(iter(test_dl))[0])
+test_dl = get_dl(test.test_data, torch.ones(test.test_data.size(0)), preprocess, 10000)
+with switch_to_cpu(model):
+    preds = model(next(iter(test_dl))[0])
 preds = preds.argmax(dim=1)
 import pandas as pd
 df = pd.DataFrame()
@@ -267,22 +325,4 @@ df['Class'] = preds
 df.index.name = 'Id'
 df.to_csv('submission.csv')
 df
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
 

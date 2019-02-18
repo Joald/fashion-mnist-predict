@@ -9,8 +9,6 @@
 
 # !pip install python-mnist
 from mnist import MNIST
-import types
-
 
 mndata = MNIST('.')
 mndata.gz = True
@@ -142,10 +140,12 @@ plt.show()
 
 # The average images gave us important information: all of the clothing has the same orientation. This suggests that, unlike in a real life scenario, this dataset will punish augmentation by anything that is not a symmetry on the general shape of that category. This means that nothing can be augmented using rotation, everything aside from shoes can be reflected along the vertical axis, and shear can be used for everything. It is worth mentioning that the shoe images distinctly differ from the others, so it might be worth training a model that decides between shoes and everything else and ensembling it with two specific models.
 
+# DISCLAIMER: I used cuda when training the models, so if running the cells provides a slightly different accuracy it is because cuda results are different than cpu results.
+
 # ## First model
 # I took the first model from the ["What is torch.nn really?"](https://pytorch.org/tutorials/beginner/nn_tutorial.html) tutorial. It was created for the MNIST dataset, so MNIST-fashion was easy to swap into it.
 
-# In[108]:
+# In[202]:
 
 
 import torch
@@ -159,7 +159,7 @@ from sklearn.metrics import accuracy_score
 
 cuda = torch.device("cuda")
 cpu = torch.device("cpu")
-dev = cpu #cuda if torch.cuda.is_available() else cpu
+dev = cuda if torch.cuda.is_available() else cpu
 
 @contextmanager
 def switch_to_cpu(model):
@@ -230,6 +230,8 @@ def loss(model, loss_func, data_loader):
     losses, nums = zip(*[loss_batch(model, loss_func, xb, yb) for xb, yb in data_loader])
     return np.sum(np.multiply(losses, nums)) / np.sum(nums)
 
+
+
 def fit(model, loss_func, opt, train_dl, *, valid_dl=None, max_epochs=20, threshold=1e-6, min_epochs=None, silent=False):
     validation = valid_dl is not None
     print("Fitting a model...")
@@ -274,9 +276,6 @@ def fit(model, loss_func, opt, train_dl, *, valid_dl=None, max_epochs=20, thresh
         epoch += 1
     return np.array([losses, accuracies])
 
-def initer(layer):
-    if type(layer) == nn.Conv2d:
-        pass#nn.init.kaiming_normal_(layer.weight)
 
 def preprocess(x, y):
     return x.view(-1, 1, 28, 28).to(dev), y.to(dev)
@@ -285,61 +284,83 @@ def get_dl(xs, ys, prep=preprocess, bs=30):
     return WrappedDataLoader(DataLoader(TensorDataset(xs.type(torch.float32), ys), batch_size=bs), prep)
 
 def get_dls(xs, ys, prep=preprocess, bs=30):
-    n = len(ys) * 3 // 10
-    return {'train': get_dl(xs[:n], ys[:n], prep, bs), 'valid': get_dl(xs[n:], ys[n:], prep, bs)}
+    n = len(ys) // 5
+    return {'valid': get_dl(xs[:n], ys[:n], prep, bs), 'train': get_dl(xs[n:], ys[n:], prep, bs)}
         
 torch.manual_seed(213742069)
 torch.cuda.manual_seed_all(213742069)
 torch.cuda.manual_seed(213742069)
 train = FashionMNIST('.', download=True, train=True)
         
-model = get_model()
-model.to(dev)
-model.apply(initer)
+first_model = get_model()
+first_model.to(dev)
 dls = get_dls(train.train_data, train.train_labels)
-results = fit(model, F.cross_entropy, torch.optim.Adam(model.parameters()), dls['train'], valid_dl=dls['valid'], threshold=None, min_epochs=50)
+results = fit(first_model, F.cross_entropy, torch.optim.Adam(first_model.parameters()), dls['train'], valid_dl=dls['valid'], min_epochs=50, max_epochs=50)
 print("DONE!")
 
 
-# This achieved a Kaggle score of less than 0.85, so not the best. Let's see some statistics.
+# This achieved a Kaggle score of around 0.85, so decent but not the best. Let's see some statistics.
 
-# In[115]:
+# In[198]:
 
 
 acc = []
-for y, xs in enumerate(categorized):
-    n = len(xs)
-    ys = y * torch.ones(n)
-    xs = next(iter(get_dl(torch.from_numpy(xs), ys, preprocess, n)))[0]
-    acc.append(accuracy_score(ys, model(xs).argmax(dim=1)))
+with switch_to_cpu(first_model):
+    for y, xs in enumerate(categorized):
+        n = len(xs)
+        ys = y * torch.ones(n)
+        xs = next(iter(get_dl(torch.from_numpy(xs), ys, preprocess, n)))[0]
+        acc.append(accuracy_score(ys, first_model(xs).argmax(dim=1)))
 
 plt.figure(figsize=(16, 9))
-plt.bar(range(10), acc)
+plt.bar(str_labels, acc)
+for i, v in enumerate(acc):
+    plt.text(i - 0.19,  v - 0.05,  v * 100 // 1 / 100)
 plt.xlabel('classes')
 plt.ylabel('accuracy')
 plt.title('Class accuracies')
 plt.show()
 
 
-# In[123]:
+# In[184]:
 
 
-preds = model(next(iter(get_dl(train.train_data, train.train_labels, preprocess, 10000000)))[0]).argmax(dim=1)
-acc = accuracy_score(train.train_labels, preds)
+acc = []
+with switch_to_cpu(first_model):
+    for y, xs in enumerate(categorized):
+        n = len(xs)
+        ys = y * torch.ones(n)
+        xs = next(iter(get_dl(torch.from_numpy(xs), ys, preprocess, n)))[0]
+        acc.append(accuracy_score(ys, first_model(xs).argmax(dim=1)))
+
 plt.figure(figsize=(16, 9))
-plt.pie([acc_full, 1 - acc])
-plt.title("Full accuracy: %s" % acc) 
+plt.bar(str_labels, acc)
+for i, v in enumerate(acc):
+    plt.text(i - 0.19,  v - 0.05,  v * 100 // 1 / 100)
+plt.xlabel('classes')
+plt.ylabel('accuracy')
+plt.title('Class accuracies')
 plt.show()
 
 
-# In[116]:
+# In[201]:
 
 
-for i, (title, ylimits) in enumerate(zip(['Loss', 'Accuracy'], [(0.3, 0.7), (0.75, 0.9)])):
+with switch_to_cpu(first_model):
+    preds = first_model(next(iter(get_dl(train.train_data, train.train_labels, preprocess, 10000000)))[0]).argmax(dim=1)
+    acc = accuracy_score(train.train_labels, preds)
+plt.figure(figsize=(16, 9))
+plt.pie([acc, 1 - acc])
+plt.title("Full train + valid accuracy: %s" % acc) 
+plt.show()
+
+
+# In[186]:
+
+
+for i, (title, ylimits) in enumerate(zip(['Loss', 'Accuracy'], [(0.3, 0.57), (0.80, 0.9)])):
     plt.style.use('fivethirtyeight')
     plt.figure(figsize=(16, 9))
-    # results_ = np.array(results)[1]
-    #for acc, label in zip(results_, ['binary', 'boot', 'non_boot']):
     plt.plot(results[i, :, 0], label='valid')
     plt.plot(results[i, :, 1], label='train')
     plt.ylim(*ylimits)
@@ -350,12 +371,12 @@ for i, (title, ylimits) in enumerate(zip(['Loss', 'Accuracy'], [(0.3, 0.7), (0.7
     plt.show()
 
 
-# We see that the loss on validation reaches the minimum almost immediately, even though the accuracy climbs back up from the downfall around epoch 20.  
-# Furthermore, it is really bad at detecting shirts, with only 60% accuracy. 
+# We see that the loss on validation reaches the minimum almost immediately, even though the accuracy still climbs until the end.  
+# Furthermore, it is really bad at detecting shirts, with only 65% accuracy. 
 
 # Next thing I tried was ensembling 3 separate models as discussed earlier.
 
-# In[56]:
+# In[187]:
 
 
 # Warning: takes at least 15 minutes to run
@@ -404,11 +425,11 @@ data_loaders.append(get_dls(train.train_data.masked_select(mask_x).view(-1, 28, 
 mask_x, mask_y = 1 - mask_x, 1 - mask_y
 data_loaders.append(get_dls(train.train_data.masked_select(mask_x).view(-1, 28, 28), train.train_labels.masked_select(mask_y), prep_indexer(not_boots)))
 
-models = [get_model(2), get_model(3), get_model(7)]
+boot_models = [get_model(2), get_model(3), get_model(7)]
 min_epochs = [5, 20, 20]
 max_epochs = [7, 25, None]
 results = []
-for model, dl, min_epoch, max_epoch in zip(models, data_loaders, min_epochs, max_epochs):
+for model, dl, min_epoch, max_epoch in zip(boot_models, data_loaders, min_epochs, max_epochs):
     model.to(dev)
     model.apply(initer)
     train_dl, valid_dl = (dl, None) if dl.__class__ == WrappedDataLoader else dl
@@ -425,10 +446,11 @@ for model, dl, min_epoch, max_epoch in zip(models, data_loaders, min_epochs, max
 print("DONE!")
 
 
-# In[75]:
+# In[188]:
 
 
-for i, (title, ylimits) in enumerate(zip(['Loss', 'Accuracy'], [(0., 0.9), (0.68, 1.01)])):
+results = np.array(results)
+for i, (title, ylimits) in enumerate(zip(['Loss', 'Accuracy'], [(-0.05, 0.75), (0.72, 1.01)])):
     plt.figure(figsize=(16, 9))
     for acc, label in zip(results[:, i], ['binary', 'boot', 'non_boot']):
         plt.plot(acc[:, 0], label=label + '_valid')
@@ -443,16 +465,16 @@ for i, (title, ylimits) in enumerate(zip(['Loss', 'Accuracy'], [(0., 0.9), (0.68
 
 # The plots don't appear like we fixed the issues mentioned earlier, let's see the prediction accuracy though.
 
-# In[121]:
+# In[190]:
 
 
 def predict(X):
-    X1 = models[0](X)
+    X1 = boot_models[0](X)
     X1 = X1.argmax(dim=1)
     X2 = []
     for i, x in enumerate(X1):
         # x == 1 means binary model thinks it's a boot
-        res = models[2 - x](X[i].view(1, 1, 28, 28))
+        res = boot_models[2 - x](X[i].view(1, 1, 28, 28))
         val = res.argmax(dim=1).item()
         X2.append(boots[val] if x == 1 else not_boots[val])
     
@@ -460,17 +482,20 @@ def predict(X):
 
 accs_cat = []
 accs_cat_binary = []
-for i, cat in enumerate(categorized):
-    n = len(cat)
-    ys = i * torch.ones(n)
-    trains = next(iter(get_dl(torch.from_numpy(cat), ys, prep_ens, n)))
-    preds = predict(trains[0])
-    accs_cat.append(accuracy_score(ys, preds[0]))
-    accs_cat_binary.append(accuracy_score(trains[1], preds[1]))
+with switch_to_cpu(boot_models[0]), switch_to_cpu(boot_models[1]), switch_to_cpu(boot_models[2]):
+    for i, cat in enumerate(categorized):
+        n = len(cat)
+        ys = i * torch.ones(n)
+        trains = next(iter(get_dl(torch.from_numpy(cat), ys, prep_ens, n)))
+        preds = predict(trains[0])
+        accs_cat.append(accuracy_score(ys, preds[0]))
+        accs_cat_binary.append(accuracy_score(trains[1], preds[1]))
 
 plt.figure(figsize=(16, 9))
 plt.bar(range(10), accs_cat_binary, label='binary')
-plt.bar(range(10), accs_cat, label='full ensemble')
+plt.bar(str_labels, accs_cat, label='full ensemble')
+for i, v in enumerate(accs_cat):
+    plt.text(i - 0.19,  v - 0.05,  v * 100 // 1 / 100)
 plt.title("Class accuracy comparison")
 plt.xlabel('classes')
 plt.ylabel('accuracy')
@@ -478,12 +503,13 @@ plt.legend(loc=3)
 plt.show()
 
 
-# In[124]:
+# In[191]:
 
 
-trains = next(iter(get_dl(train.train_data, train.train_labels, prep_ens, 10000000)))
-preds = predict(trains[0])
-acc_full = accuracy_score(train.train_labels, preds[0])
+with switch_to_cpu(boot_models[0]), switch_to_cpu(boot_models[1]), switch_to_cpu(boot_models[2]):
+    trains = next(iter(get_dl(train.train_data, train.train_labels, prep_ens, 10000000)))
+    preds = predict(trains[0])
+    acc_full = accuracy_score(train.train_labels, preds[0])
 
 plt.figure(figsize=(16, 9))
 plt.pie([acc_full, 1 - acc_full])
@@ -491,18 +517,18 @@ plt.title("Full accuracy: %s" % acc_full)
 plt.show()
 
 
-# The train set accuracy actually decreased by 2%, the kaggle score suffered a similar loss. But let's check if it improved any single class.
+# Firstly, the net performs really well at deciding if something belongs to one of the 3 boot classes. However, the subnets show significantly lower accuracy, which is reflected by the end results: the train set accuracy actually decreased by a few percent compared to the first model and the kaggle score suffered a similar loss. But let's check if it improved any single class.
 
-# In[135]:
+# In[193]:
 
 
-with torch.no_grad():
+with torch.no_grad(), switch_to_cpu(boot_models[0]), switch_to_cpu(boot_models[1]), switch_to_cpu(boot_models[2]), switch_to_cpu(first_model):
     acc = np.ones(10)
     for y, xs in enumerate(categorized):
         n = len(xs)
         ys = y * torch.ones(n)
         xs = next(iter(get_dl(torch.from_numpy(xs), ys, preprocess, n)))[0]
-        acc[y] = accuracy_score(ys, model(xs).argmax(dim=1))
+        acc[y] = accuracy_score(ys, first_model(xs).argmax(dim=1))
 
     accs_cat = np.ones(10)
     for i, cat in enumerate(categorized):
@@ -511,6 +537,10 @@ with torch.no_grad():
         trains = next(iter(get_dl(torch.from_numpy(cat), ys, prep_ens, n)))
         preds = predict(trains[0])
         accs_cat[i] = accuracy_score(ys, preds[0])
+
+
+# In[194]:
+
 
 plt.figure(figsize=(16, 9))
 plt.bar(str_labels, accs_cat - acc)
@@ -521,16 +551,40 @@ plt.ylabel('accuracy')
 plt.show()
 
 
-# The new net was gained a lot when classifying sneakers, while losing the most on the most problematic class, shirts. While the loss of accuracy on ankle boots is somewhat worrying, this can still prove be a decent ensemble if the base nets are improved.  
-# However, the time has come for data augmentation. Let's stick with the first model and benchmark different augmentations on that.
+# This looks like it suffered losses on almost all classes, so no point trying that further. 
+# 
+# However, the time has come for data augmentation. Let's stick with the first model and benchmark different augmentations on that. I used the same process as above to check the usefulness of the following augmentation methods:
 
-# In[ ]:
+# In[208]:
+
+
+import torchvision.transforms as tt
+from transforms import RandomErasing # https://github.com/zhunzhong07/Random-Erasing/blob/master/transforms.py
+
+aff = tt.Compose([
+    tt.RandomAffine(0, translate=(1 / 10, 1/10), shear=10, fillcolor=0),
+    tt.ToTensor()
+])
+re = tt.Compose([
+    tt.ToTensor(),
+    Lambda(lambda x: x.view(1, 28, 28)),
+    RandomErasing() 
+])
+hflip = tt.Compose([
+    tt.RandomHorizontalFlip()
+])
+
+
+# Sad
+
+# In[203]:
 
 
 test = FashionMNIST('.', download=True, train=False)
 test_dl = get_dl(test.test_data, torch.ones(test.test_data.size(0)), preprocess, 10000)
-preds = predict(next(iter(test_dl))[0])[0]
-# preds = preds.argmax(dim=1)
+with switch_to_cpu(first_model):
+    preds = first_model(next(iter(test_dl))[0])#[0]
+preds = preds.argmax(dim=1)
 import pandas as pd
 df = pd.DataFrame()
 df['Class'] = preds
